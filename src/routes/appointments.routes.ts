@@ -1,27 +1,43 @@
 import { Router } from 'express';
-import { startOfHour, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import CreateAppointmentService from '../services/CreateAppointmentService';
 import AppointmentsRepository from '../repositories/AppointmentsRepository';
 
 const appointmentsRouter = Router();
 const appointmentsRepository = new AppointmentsRepository();
 
+//Receber a requisição, chamar outro arquivo pra tratar a requisição, devolver uma respostas
+
+//Transformação de dados fica na rota
+appointmentsRouter.get('/', (request, response) => {
+  const appointments = appointmentsRepository.all();
+
+  return response.json(appointments);
+});
+
 appointmentsRouter.post('/', (request, response) => {
-  const { provider, date } = request.body;
+  try {
+    const { provider, date } = request.body;
 
-  const parsedDate = startOfHour(parseISO(date));
+    const parsedDate = parseISO(date);
 
-  const findAppointmentInSameDate =
-    appointmentsRepository.findByDate(parsedDate);
+    const createAppointments = new CreateAppointmentService(
+      appointmentsRepository,
+    );
 
-  if (findAppointmentInSameDate) {
-    return response
-      .status(400)
-      .json({ message: 'This appointment is already booked' });
+    const appointment = createAppointments.execute({
+      date: parsedDate,
+      provider,
+    });
+
+    return response.json(appointment);
+  } catch (error) {
+    if (error instanceof Error) {
+      return response.status(400).json({ error: error.message });
+    } else {
+      return response.status(400).json({ error: 'Unexpected error' });
+    }
   }
-
-  const appointment = appointmentsRepository.create(provider, date);
-
-  return response.json(appointment);
 });
 
 export default appointmentsRouter;
